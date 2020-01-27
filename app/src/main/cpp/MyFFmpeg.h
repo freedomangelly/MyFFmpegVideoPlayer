@@ -8,6 +8,7 @@
 #include <pthread.h>
 #include "FFMpegJniCall.h"
 #include "FFmpegAudio.h"
+#include "FFmpegVideo.h"
 
 extern "C"{
 #include <libavformat/avformat.h>
@@ -19,10 +20,12 @@ public:
 //    AVCodecContext *pCodecContext=NULL;
 //    SwrContext *swrContext = NULL;
 
-    uint8_t *resampleOutBuffer=NULL;
+//    uint8_t *resampleOutBuffer=NULL;
     char* url=NULL;
     FFMpegJniCall *jniCall=NULL;
     FFmpegAudio *pAudio=NULL;
+    FFmpegPlayerStatus *pPlayerStatus;
+    FFmpegVideo *pVideo;
 
 public :
     MyFFmpeg(FFMpegJniCall *jniCall ,const char* url);
@@ -35,6 +38,7 @@ public:
     void prepare(ThreadMode threadMode);
     void callPlayerJniError(ThreadMode threadMode,int code,char* msg);
     void release();
+    void setSurface(jobject surface);
 };
 
 

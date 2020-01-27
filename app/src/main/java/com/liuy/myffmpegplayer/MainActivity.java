@@ -66,8 +66,6 @@ public class MainActivity extends AppCompatActivity {
 
     public void play(View view){
         mVideoView.play(mMusicFile.getAbsolutePath());
-        decodeView(mMusicFile.getAbsolutePath(),mVideoView.getHolder().getSurface());
     }
 
-    private native void decodeView(String absoluteFile, Surface surface);
 }

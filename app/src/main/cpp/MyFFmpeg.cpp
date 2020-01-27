@@ -11,10 +11,35 @@ MyFFmpeg::MyFFmpeg(FFMpegJniCall *jniCall, const char *url) {
     this->url= static_cast<char *>(malloc(strlen(url) + 1));
     LOGI("enter MyFFmpeg Play2 %s",url);
     memcpy((void *) this->url, url, strlen(url) + 1);
+
+    pPlayerStatus=new FFmpegPlayerStatus();
 }
 
 MyFFmpeg::~MyFFmpeg() {
     release();
+}
+
+void *threadReadPacket(void *context) {
+    MyFFmpeg *pFFmpeg = (MyFFmpeg *) context;
+    while (pFFmpeg->pPlayerStatus != NULL && !pFFmpeg->pPlayerStatus->isExit) {
+        AVPacket *pPacket = av_packet_alloc();
+        if (av_read_frame(pFFmpeg->pFormatContext, pPacket) >= 0) {
+            if (pPacket->stream_index == pFFmpeg->pAudio->streamIndex) {
+                pFFmpeg->pAudio->pPacketQueue->push(pPacket);
+            } else if (pPacket->stream_index == pFFmpeg->pVideo->streamIndex) {
+                pFFmpeg->pVideo->pPacketQueue->push(pPacket);
+            } else {
+                // 1. 解引用数据 data ， 2. 销毁 pPacket 结构体内存  3. pPacket = NULL
+                av_packet_free(&pPacket);
+            }
+        } else {
+            // 1. 解引用数据 data ， 2. 销毁 pPacket 结构体内存  3. pPacket = NULL
+            av_packet_free(&pPacket);
+            // 睡眠一下，尽量不去消耗 cpu 的资源，也可以退出销毁这个线程
+            // break;
+        }
+    }
+    return 0;
 }
 
 //void *threadPlay(void *context){
@@ -29,13 +54,18 @@ void MyFFmpeg::play() {
 //    pFFmpeg->prepare();
 
 //子线程
-//    pthread_t playThreadT;
-//    pthread_create(&playThreadT,NULL,threadPlay,this);
-//    pthread_detach(playThreadT);
+    pthread_t readPacketTreadT;
+    pthread_create(&readPacketTreadT,NULL,threadReadPacket,this);
+    pthread_detach(readPacketTreadT);
     LOGI("nPlay 2");
     if(pAudio!=NULL){
         LOGI("nPlay 3");
         pAudio->play();
+    }
+
+    if(pVideo!=NULL){
+        LOGI("nPlay 4");
+        pVideo->play();
     }
 
 }
@@ -48,16 +78,6 @@ void MyFFmpeg::prepare(ThreadMode threadMode) {
 
     int formatOpenInputRes = 0;
     int formatFindStreamInfoRes = 0;
-    int audioStramIndex = -1;
-//    AVCodecParameters *pCodecParameters;
-//    AVCodec *pCodec = NULL;
-//    int codecParametersToContextRes = -1;
-//    int codecOpenRes = -1;
-    int index = 0;
-    AVPacket *pPacket = NULL;
-    AVFrame *pFrame = NULL;
-    LOGE(" url= %s", this->url);
-//    const char*url2="/storage/emulated/0/ental.mp3";
     LOGI("1111111111111111111111111");
     formatOpenInputRes = avformat_open_input(&pFormatContext, url, NULL, NULL);
     if (formatOpenInputRes != 0) {
@@ -78,7 +98,7 @@ void MyFFmpeg::prepare(ThreadMode threadMode) {
     }
     LOGI("1111111111111111111111113");
     // 查找音频流的 index
-    audioStramIndex = av_find_best_stream(pFormatContext, AVMediaType::AVMEDIA_TYPE_AUDIO, -1, -1,
+    int audioStramIndex = av_find_best_stream(pFormatContext, AVMediaType::AVMEDIA_TYPE_AUDIO, -1, -1,
                                           NULL, 0);
     if (audioStramIndex < 0) {
         LOGE("format audio stream error: %s");
@@ -87,67 +107,29 @@ void MyFFmpeg::prepare(ThreadMode threadMode) {
         return;
     }
     LOGI("1111111111111111111111114");
-//    LOGI("1111111111111111111111114");
-//    // 查找解码
-//    pCodecParameters = pFormatContext->streams[audioStramIndex]->codecpar;
-//    pCodec = avcodec_find_decoder(pCodecParameters->codec_id);
-//    if (pCodec == NULL) {
-//        LOGE("codec find audio decoder error");
-//        // 这种方式一般不推荐这么写，但是的确方便
-//        callPlayerJniError(threadMode,CODEC_FIND_DECODER_ERROR_CODE, "codec find audio decoder error");
-//        return;
-//    }
-//    LOGI("1111111111111111111111115");
-//    // 打开解码器
-//    pCodecContext = avcodec_alloc_context3(pCodec);
-//    if (pCodecContext == NULL) {
-//        LOGE("codec alloc context error");
-//        // 这种方式一般不推荐这么写，但是的确方便
-//        callPlayerJniError(threadMode,CODEC_ALLOC_CONTEXT_ERROR_CODE, "codec alloc context error");
-//        return;
-//    }
-//    LOGI("1111111111111111111111116");
-//    codecParametersToContextRes = avcodec_parameters_to_context(pCodecContext, pCodecParameters);
-//    if (codecParametersToContextRes < 0) {
-//        LOGE("codec parameters to context error: %s", av_err2str(codecParametersToContextRes));
-//        callPlayerJniError(threadMode,codecParametersToContextRes, av_err2str(codecParametersToContextRes));
-//        return;
-//    }
-//    LOGI("1111111111111111111111117");
-//    codecOpenRes = avcodec_open2(pCodecContext, pCodec, NULL);
-//    if (codecOpenRes != 0) {
-//        LOGI("codec audio open error: %s", av_err2str(codecOpenRes));
-//        callPlayerJniError(threadMode,codecOpenRes, av_err2str(codecOpenRes));
-//        return;
-//    }
-//    LOGI("1111111111111111111111118");
-//    // ---------- 重采样 start ----------
-//    int64_t out_ch_layout = AV_CH_LAYOUT_STEREO;
-//    enum AVSampleFormat out_sample_fmt = AVSampleFormat::AV_SAMPLE_FMT_S16;
-//    int out_sample_rate = AUDIO_SAMPLE_RATE;
-//    int64_t in_ch_layout = pCodecContext->channel_layout;
-//    enum AVSampleFormat in_sample_fmt = pCodecContext->sample_fmt;
-//    int in_sample_rate = pCodecContext->sample_rate;
-//    swrContext = swr_alloc_set_opts(NULL, out_ch_layout, out_sample_fmt,
-//                                    out_sample_rate, in_ch_layout, in_sample_fmt, in_sample_rate, 0, NULL);
-//    if (swrContext == NULL) {
-//        // 提示错误
-//        callPlayerJniError(threadMode,SWR_ALLOC_SET_OPTS_ERROR_CODE, "swr alloc set opts error");
-//        return;
-//    }
-//    LOGI("1111111111111111111111119");
-//    int swrInitRes = swr_init(swrContext);
-//    if (swrInitRes < 0) {
-//        callPlayerJniError(threadMode,SWR_CONTEXT_INIT_ERROR_CODE, "swr context swr init error");
-//        return;
-//    }
-//    LOGI("1111111111111111111111111 10");
-    pAudio=new FFmpegAudio(audioStramIndex,jniCall, NULL,pFormatContext);
+
+    pAudio=new FFmpegAudio(audioStramIndex,jniCall,pPlayerStatus);
     LOGI("1111111111111111111111115");
-    pAudio->analysisStream(threadMode,pFormatContext->streams);
+    pAudio->analysisStream(threadMode,pFormatContext);
     LOGI("1111111111111111111111116");
-    jniCall->callPlayerPrepared(threadMode);
+    int videoStreamIndex=av_find_best_stream(pFormatContext,AVMEDIA_TYPE_VIDEO,-1,-1,NULL,0);
+    //如果没有音频就直接播放视频
     LOGI("1111111111111111111111117");
+    if (videoStreamIndex < 0) {
+        LOGE("format video stream error.");
+        // 这种方式一般不推荐这么写，但是的确方便
+        callPlayerJniError(threadMode, FIND_STREAM_ERROR_CODE, "find video stream error");
+        return;
+    }
+    LOGI("1111111111111111111111118");
+    //不是我的事我不干，但是搭建也不要想的过于复杂
+    pVideo=new FFmpegVideo(videoStreamIndex,jniCall,pPlayerStatus,pAudio);
+    LOGI("1111111111111111111111119");
+    pVideo->analysisStream(threadMode,pFormatContext);
+
+    LOGI("111111111111111111111111 10");
+    jniCall->callPlayerPrepared(threadMode);
+    LOGI("111111111111111111111111 11");
 
 }
 void *threadPrepare(void *context) {
@@ -168,11 +150,6 @@ void MyFFmpeg::callPlayerJniError(ThreadMode threadMode,int code, char *msg) {
 }
 
 void MyFFmpeg::release() {
-//    if(pCodecContext !=NULL){
-//        avcodec_close(pCodecContext);
-//        avcodec_free_context(&pCodecContext);
-//        pCodecContext=NULL;
-//    }
 
     if(pFormatContext!=NULL){
         avformat_close_input(&pFormatContext);
@@ -180,25 +157,36 @@ void MyFFmpeg::release() {
         pFormatContext=NULL;
     }
 
-//    if(swrContext!=NULL){
-//        swr_free(&swrContext);
-//        free(swrContext);
-//        swrContext=NULL;
-//    }
-    if(resampleOutBuffer!=NULL){
-        free(resampleOutBuffer);
-        resampleOutBuffer=NULL;
-    }
     avformat_network_deinit();
     if(url!=NULL){
         free((void *) url);
         url=NULL;
     }
 
+    if(pPlayerStatus !=NULL){
+        delete(pPlayerStatus);
+        pPlayerStatus=NULL;
+    }
+    if(pAudio!=NULL){
+        delete (pAudio);
+        pAudio=NULL;
+    }
+    if(pVideo!=NULL){
+        delete(pVideo);
+        pVideo=NULL;
+    }
+
 }
 
 void MyFFmpeg::prepare() {
     prepare(THREAD_MAIN);
+}
+
+void MyFFmpeg::setSurface(jobject surface) {
+    if(pVideo!=NULL){
+        pVideo->setSurface(surface);
+    }
+
 }
 
 

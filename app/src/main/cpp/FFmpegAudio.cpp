@@ -5,51 +5,50 @@
 #include "FFmpegAudio.h"
 #include "MyConsts.h"
 
-FFmpegAudio::FFmpegAudio(int audioStreamIndex, FFMpegJniCall *pJniCall, AVCodecContext *pCodecContext,
-            AVFormatContext *pFormatContext){
-    this->audioStreamIndex=audioStreamIndex;
-    this->pJniCall=pJniCall;
-//    this->pCodecContext = pCodecContext;
-    this->pFormatContext=pFormatContext;
-
-    pPacketQueue=new FFmpegPacketQueue();
-    pPlayerStatus=new FFmpegPlayerStatus();
+FFmpegAudio::FFmpegAudio(int audioStreamIndex, FFMpegJniCall *pJniCall ,FFmpegPlayerStatus *pPlayerStatus):FFmpegMedia(audioStreamIndex,pJniCall,pPlayerStatus){
+//    this->audioStreamIndex=audioStreamIndex;
+//    this->pJniCall=pJniCall;
+////    this->pCodecContext = pCodecContext;
+//    this->pFormatContext=pFormatContext;
+//
+//    pPacketQueue=new FFmpegPacketQueue();
+//    pPlayerStatus=new FFmpegPlayerStatus();
 }
 
-void *threadPlay2(void *context){
+void *threadAudioPlay(void *context){
     FFmpegAudio *pFFmpeg= static_cast<FFmpegAudio *>(context);
     pFFmpeg->initCreateOpenSLES();
     return 0;
 }
 
-void *threadReadPacket(void *context){
-    FFmpegAudio *pAudio= static_cast<FFmpegAudio *>(context);
-    while (pAudio->pPlayerStatus!=NULL && !pAudio->pPlayerStatus->isExit){
-        AVPacket *pPacket = av_packet_alloc();
-        if(av_read_frame(pAudio->pFormatContext,pPacket)>=0){
-            if(pPacket->stream_index==pAudio->audioStreamIndex){
-                pAudio->pPacketQueue->push(pPacket);
-            } else{
-                // 1. 解引用数据 data ， 2. 销毁 pPacket 结构体内存  3. pPacket = NULL
-                av_packet_free(&pPacket);
-            }
-        } else{
-            // 1. 解引用数据 data ， 2. 销毁 pPacket 结构体内存  3. pPacket = NULL
-            av_packet_free(&pPacket);
-            // 睡眠一下，尽量不去消耗 cpu 的资源，也可以退出销毁这个线程
-        }
-    }
-}
+//void *threadReadPacket(void *context){
+//    FFmpegAudio *pAudio= static_cast<FFmpegAudio *>(context);
+//    while (pAudio->pPlayerStatus!=NULL && !pAudio->pPlayerStatus->isExit){
+//        AVPacket *pPacket = av_packet_alloc();
+//        if(av_read_frame(pAudio->pFormatContext,pPacket)>=0){
+//            if(pPacket->stream_index==pAudio->audioStreamIndex){
+//                pAudio->pPacketQueue->push(pPacket);
+//            } else{
+//                // 1. 解引用数据 data ， 2. 销毁 pPacket 结构体内存  3. pPacket = NULL
+//                av_packet_free(&pPacket);
+//            }
+//        } else{
+//            // 1. 解引用数据 data ， 2. 销毁 pPacket 结构体内存  3. pPacket = NULL
+//            av_packet_free(&pPacket);
+//            // 睡眠一下，尽量不去消耗 cpu 的资源，也可以退出销毁这个线程
+//        }
+//    }
+//}
 
 void FFmpegAudio::play() {
-    //一个线程读取
-    pthread_t readPacketTheadT;
-    pthread_create(&readPacketTheadT,NULL,threadReadPacket,this);
-    pthread_detach(readPacketTheadT);
+//    //一个线程读取
+//    pthread_t readPacketTheadT;
+//    pthread_create(&readPacketTheadT,NULL,threadReadPacket,this);
+//    pthread_detach(readPacketTheadT);
 
     //一个线程播放
     pthread_t  playThreadT;
-    pthread_create(&playThreadT,NULL,threadPlay2,this);
+    pthread_create(&playThreadT, NULL, threadAudioPlay, this);
     pthread_detach(playThreadT);
 }
 
@@ -127,29 +126,36 @@ int FFmpegAudio::resampleAudio() {
 //    while (av_read_frame(pFormatContext,pPacket)>=0){
         while (pPlayerStatus!=NULL && !pPlayerStatus->isExit){
             pPacket=pPacketQueue->pop();
-        if(pPacket->stream_index==audioStreamIndex){
+//        if(pPacket->stream_index==audioStreamIndex){
             //pPacket 包，压缩的数据，解码成pcm数据
             int codecSendPacketRes=avcodec_send_packet(pCodecContext,pPacket);
             if(codecSendPacketRes==0){
                 int codecReceiveFrameRes=avcodec_receive_frame(pCodecContext,pFrame);
                 if(codecReceiveFrameRes==0){
-                    LOGI("解码音频帧");
+
                     //调用重采样的方法 返回值是返回重采样的个数，也就是 pFrame->nb_samples
                     dataSize=swr_convert(swrContext, &resampleOutBuffer, pFrame->nb_samples,
                                          (const uint8_t **) (pFrame->data), pFrame->nb_samples);
                     //dataSize帧数不够
 
                     dataSize=dataSize *2 *2; //*每个点占2位*每个点两通道
+                    LOGI("解码音频帧：%d,%d",dataSize,pFrame->nb_samples);
                     // write 写到缓冲区 pFrame.data -> javabyte
                     // size 是多大，装 pcm 的数据
                     // 1s 44100 点  2通道 ，2字节    44100*2*2
                     // 1帧不是一秒，pFrame->nb_samples点
-                    LOGI("解码音频帧：%d,%d",dataSize,pFrame->nb_samples);
+
+                    //设置当前的时间，方便回调进度给java,方便视频同步音频
+                    double times=av_frame_get_best_effort_timestamp(pFrame) * av_q2d(timeBase);//s
+                    if(times > currentTime){
+                        currentTime=times;
+                    }
+
                     break;
                 }
             }
 
-        }
+//        }
         av_packet_unref(pPacket);
         av_frame_unref(pFrame);
     }
@@ -159,93 +165,12 @@ int FFmpegAudio::resampleAudio() {
 }
 
 
-void FFmpegAudio::initCreateAudioTrack(JNIEnv *env) {
-    //public AudioTrack(int streamType, int sampleRateInHz, int channelConfig, int audioFormat,
-    //            int bufferSizeInBytes, int mode)
-    jclass jAudioTrackClass = env->FindClass("android/media/AudioTrack");
-    jmethodID jAudioTackCMid = env->GetMethodID(jAudioTrackClass, "<init>", "(IIIIII)V");
-    //public static final int STREAM_MUSIC = AudioSystem.STREAM_MUSIC;
-    jclass jAudioManager = env->FindClass("android/media/AudioManager");
-    jfieldID jfieldId=env->GetStaticFieldID(jAudioManager, "STREAM_MUSIC", "I");
-    int type = env->GetStaticIntField(jAudioManager,jfieldId);
-
-    int streamType = type;
-    int sampleRateInHz = AUDIO_SAMPLE_RATE;
-    int channelConfig = (0x4 | 0x8);
-    int audioFormat = 2;
-    jmethodID jWriteMid;
-    int mode = 1;//短声音用0 长生意用1
-    //static public int getMinBufferSize(int sampleRateInHz, int channelConfig, int audioFormat)
-    jmethodID getMinBufferSizeMid = env->GetStaticMethodID(jAudioTrackClass, "getMinBufferSize",
-                                                              "(III)I");
-    int bufferSizeInBytes = env->CallStaticIntMethod(jAudioTrackClass, getMinBufferSizeMid,
-                                                        sampleRateInHz,
-                                                        channelConfig, audioFormat);
-    LOGI("bufferSizeInbytes = %d", bufferSizeInBytes);
-    jAudioTrackOjb = env->NewObject(jAudioTrackClass, jAudioTackCMid, streamType,
-                                       sampleRateInHz, channelConfig, audioFormat,
-                                       bufferSizeInBytes, mode);
-
-    //play
-    jmethodID playMid = env->GetMethodID(jAudioTrackClass, "play", "()V");
-    env->CallVoidMethod(jAudioTrackOjb, playMid);
-
-    //write method
-
-    jAudioTrackWriteMid = env->GetMethodID(jAudioTrackClass, "write", "([BII)I");
-}
-
-void
-FFmpegAudio::callAudioTrackWrite(JNIEnv *env,jbyteArray audioData, int offsetInBytes, int sizeInBytes) {
-    env->CallIntMethod(jAudioTrackOjb,jAudioTrackWriteMid,audioData,offsetInBytes,sizeInBytes);
-}
-
 FFmpegAudio::~FFmpegAudio() {
     release();
 }
-
-void FFmpegAudio::callPlayerJniError(ThreadMode threadMode,int code, char *msg) {
-    release();
-    pJniCall->callPlayerError(threadMode,code, msg);
-}
-
-
-void FFmpegAudio::analysisStream(ThreadMode threadMode, AVStream **streams) {
-    // 查找解码
-    AVCodecParameters *pCodecParameters = pFormatContext->streams[audioStreamIndex]->codecpar;
-    AVCodec *pCodec = avcodec_find_decoder(pCodecParameters->codec_id);
-    if (pCodec == NULL) {
-        LOGE("codec find audio decoder error");
-        callPlayerJniError(threadMode, CODEC_FIND_DECODER_ERROR_CODE,
-                           "codec find audio decoder error");
-        return;
-    }
-    // 打开解码器
-    pCodecContext = avcodec_alloc_context3(pCodec);
-    if (pCodecContext == NULL) {
-        LOGE("codec alloc context error");
-        callPlayerJniError(threadMode, CODEC_ALLOC_CONTEXT_ERROR_CODE, "codec alloc context error");
-        return;
-    }
-    int codecParametersToContextRes = avcodec_parameters_to_context(pCodecContext,
-                                                                    pCodecParameters);
-    if (codecParametersToContextRes < 0) {
-        LOGE("codec parameters to context error: %s", av_err2str(codecParametersToContextRes));
-        callPlayerJniError(threadMode, codecParametersToContextRes,
-                           av_err2str(codecParametersToContextRes));
-        return;
-    }
-
-    int codecOpenRes = avcodec_open2(pCodecContext, pCodec, NULL);
-    if (codecOpenRes != 0) {
-        LOGE("codec audio open error: %s", av_err2str(codecOpenRes));
-        callPlayerJniError(threadMode, codecOpenRes, av_err2str(codecOpenRes));
-        return;
-    }
-
-    // ---------- 重采样 start ----------
-    int64_t out_ch_layout = AV_CH_LAYOUT_STEREO;
-    enum AVSampleFormat out_sample_fmt = AVSampleFormat::AV_SAMPLE_FMT_S16;
+void FFmpegAudio::privateAnalysisStream(ThreadMode threadMode, AVFormatContext *pFormatContext){
+    int64_t out_ch_layout=AV_CH_LAYOUT_STEREO;
+    enum AVSampleFormat out_sample_fmt=AVSampleFormat ::AV_SAMPLE_FMT_S16;
     int out_sample_rate = AUDIO_SAMPLE_RATE;
     int64_t in_ch_layout = pCodecContext->channel_layout;
     enum AVSampleFormat in_sample_fmt = pCodecContext->sample_fmt;
@@ -264,30 +189,30 @@ void FFmpegAudio::analysisStream(ThreadMode threadMode, AVStream **streams) {
     }
 
     resampleOutBuffer = (uint8_t *) malloc(pCodecContext->frame_size * 2 * 2);
-    // ---------- 重采样 end ----------
 }
 
 void FFmpegAudio::release() {
-    if (pPacketQueue) {
-        delete (pPacketQueue);
-        pPacketQueue = NULL;
-    }
+    FFmpegMedia::release();
+//    if (pPacketQueue) {
+//        delete (pPacketQueue);
+//        pPacketQueue = NULL;
+//    }
 
     if (resampleOutBuffer) {
         free(resampleOutBuffer);
         resampleOutBuffer = NULL;
     }
 
-    if (pPlayerStatus) {
-        delete (pPlayerStatus);
-        pPlayerStatus = NULL;
-    }
+//    if (pPlayerStatus) {
+//        delete (pPlayerStatus);
+//        pPlayerStatus = NULL;
+//    }
 
-    if (pCodecContext != NULL) {
-        avcodec_close(pCodecContext);
-        avcodec_free_context(&pCodecContext);
-        pCodecContext = NULL;
-    }
+//    if (pCodecContext != NULL) {
+//        avcodec_close(pCodecContext);
+//        avcodec_free_context(&pCodecContext);
+//        pCodecContext = NULL;
+//    }
 
     if (swrContext != NULL) {
         swr_free(&swrContext);

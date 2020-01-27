@@ -44,12 +44,13 @@ public class VideoView extends SurfaceView implements MediaPreparedListener {
     }
 
     private void stop() {
-
+        mPlayer.stop();
     }
 
 
     @Override
     public void onPrepared() {
+        mPlayer.setSurface(getHolder().getSurface());
         mPlayer.play();
     }
 }

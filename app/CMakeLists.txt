@@ -62,12 +62,21 @@ target_link_libraries( # Specifies the target library.
         EGL
         GLESv2
         android
-        avcodec
-        avfilter
-        avformat
-        avutil
-        swresample
-        swscale
+        avcodec-57
+        # 设备信息
+        avdevice-57
+        # 滤镜特效处理库
+        avfilter-6
+        # 封装格式处理库
+        avformat-57
+        # 工具库(大部分库都需要这个库的支持)
+        avutil-55
+        # 后期处理
+        postproc-54
+        # 音频采样数据格式转换库
+        swresample-2
+        # 视频像素数据格式转换
+        swscale-4
 
         # Links the target library to the log library
         # included in the NDK.

@@ -2,6 +2,7 @@ package com.liuy.myffmpegplayer.ffmpegplayer;
 
 import android.text.TextUtils;
 import android.util.Log;
+import android.view.Surface;
 
 import com.liuy.myffmpegplayer.ffmpegplayer.listener.MediaErrorListener;
 import com.liuy.myffmpegplayer.ffmpegplayer.listener.MediaPreparedListener;
@@ -91,4 +92,10 @@ public class MediaPlayerJNI {
     private native void nPrepareAsync(String url);
 
     private native void nPrepare(String url);
+
+    public void stop(){
+
+    }
+
+    public native void setSurface(Surface surface);
 }

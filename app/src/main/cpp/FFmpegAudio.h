@@ -20,24 +20,24 @@ extern "C"{
 #include "FFmpegPlayerStatus.h"
 #include "FFmpegPlayerStatus.h"
 #include "FFmpegPacketQueue.h"
+#include "FFmpegMedia.h"
 
-class FFmpegAudio {
+class FFmpegAudio :public FFmpegMedia{
 public:
-    jobject jAudioTrackOjb;
-    jmethodID  jAudioTrackWriteMid;
+//    jobject jAudioTrackOjb;
+//    jmethodID  jAudioTrackWriteMid;
     AVFormatContext *pFormatContext=NULL;
-    AVCodecContext *pCodecContext=NULL;
-    SwrContext *swrContext=NULL;
+//    AVCodecContext *pCodecContext=NULL;
     uint8_t  *resampleOutBuffer=NULL;
-    FFMpegJniCall *pJniCall=NULL;
-    int audioStreamIndex=-1;
-
-    FFmpegPlayerStatus *pPlayerStatus=NULL;
-    FFmpegPacketQueue *pPacketQueue=NULL;
+    SwrContext *swrContext=NULL;
+//    FFMpegJniCall *pJniCall=NULL;
+//    int audioStreamIndex=-1;
+//
+//    FFmpegPlayerStatus *pPlayerStatus=NULL;
+//    FFmpegPacketQueue *pPacketQueue=NULL;
 
 public:
-    FFmpegAudio(int audioStreamIndex, FFMpegJniCall *pJniCall, AVCodecContext *pCodecContext,
-            AVFormatContext *pFormatContext);
+    FFmpegAudio(int audioStreamIndex, FFMpegJniCall *pJniCall, FFmpegPlayerStatus *pPlayerStatus);
     ~FFmpegAudio();
 //    ~FFmpegAudio(JNIEnv *env);
     void play();
@@ -46,9 +46,10 @@ public:
     void initCreateAudioTrack(JNIEnv *env);
     void callAudioTrackWrite(JNIEnv *env,jbyteArray audioData,int offsetInBytes,int sizeInBytes);
     int resampleAudio();
+    void privateAnalysisStream(ThreadMode threadMode, AVFormatContext *pFormatContext);
 
-    void analysisStream(ThreadMode threadMode,AVStream **streams);
-    void callPlayerJniError(ThreadMode threadMode,int code,char *msg);
+//    void analysisStream(ThreadMode threadMode,AVStream **streams);
+//    void callPlayerJniError(ThreadMode threadMode,int code,char *msg);
     void release();
 private:
 //    void FFmpegAudio::PlayAudioTack();
