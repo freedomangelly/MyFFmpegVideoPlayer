@@ -15,6 +15,8 @@ include_directories(src/main/jniLibs/include)
 LINK_DIRECTORIES(${CMAKE_SOURCE_DIR}/src/main/jniLibs/${ANDROID_ABI})
 #指定自己便携的源文件目录
 AUX_SOURCE_DIRECTORY(${CMAKE_SOURCE_DIR}/src/main/cpp SRC_LIST)
+AUX_SOURCE_DIRECTORY(${CMAKE_SOURCE_DIR}/src/main/cpp/librtmp RTMP_LIST)
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -DNO_CRYPTO")
 
 #指定生成动态库music-player
 add_library(
@@ -25,15 +27,7 @@ add_library(
         # Provides a relative path to your source file(s).
         ${SRC_LIST}
 )
-#指定生生成动态库 native-lib
-#add_library( # Sets the name of the library.
-#        native-lib
-#
-#        # Sets the library as a shared library.
-#        SHARED
-#
-#        # Provides a relative path to your source file(s).
-#        src/main/cpp/native-lib.cpp)
+
 
 # Searches for a specified prebuilt library and stores the path as a
 # variable. Because CMake includes system libraries in the search path by
@@ -55,6 +49,7 @@ find_library( # Sets the name of the path variable.
 target_link_libraries( # Specifies the target library.
 #        native-lib
         music-player
+        android
 #        ffmpeg
         #播放音频
         OpenSLES
@@ -81,3 +76,4 @@ target_link_libraries( # Specifies the target library.
         # Links the target library to the log library
         # included in the NDK.
         ${log-lib})
+

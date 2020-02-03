@@ -21,20 +21,19 @@ extern "C"{
 #include "FFmpegPlayerStatus.h"
 #include "FFmpegPacketQueue.h"
 #include "FFmpegMedia.h"
+#include "libavutil/time.h"
 
 class FFmpegAudio :public FFmpegMedia{
 public:
-//    jobject jAudioTrackOjb;
-//    jmethodID  jAudioTrackWriteMid;
-    AVFormatContext *pFormatContext=NULL;
-//    AVCodecContext *pCodecContext=NULL;
-    uint8_t  *resampleOutBuffer=NULL;
+    pthread_t playThreadT;
     SwrContext *swrContext=NULL;
-//    FFMpegJniCall *pJniCall=NULL;
-//    int audioStreamIndex=-1;
-//
-//    FFmpegPlayerStatus *pPlayerStatus=NULL;
-//    FFmpegPacketQueue *pPacketQueue=NULL;
+    SLPlayItf  slPlayItf=NULL;
+    SLObjectItf  pPlayer=NULL;
+    SLObjectItf  mixObject=NULL;
+    SLObjectItf  engineObj=NULL;
+    SLAndroidSimpleBufferQueueItf  androidBufferQueueItf;
+    uint8_t *convertOutBuffer=NULL;
+    int frameBufferSize=0;
 
 public:
     FFmpegAudio(int audioStreamIndex, FFMpegJniCall *pJniCall, FFmpegPlayerStatus *pPlayerStatus);
@@ -42,15 +41,17 @@ public:
 //    ~FFmpegAudio(JNIEnv *env);
     void play();
 
-    void initCreateOpenSLES();
-    void initCreateAudioTrack(JNIEnv *env);
-    void callAudioTrackWrite(JNIEnv *env,jbyteArray audioData,int offsetInBytes,int sizeInBytes);
     int resampleAudio();
-    void privateAnalysisStream(ThreadMode threadMode, AVFormatContext *pFormatContext);
-
-//    void analysisStream(ThreadMode threadMode,AVStream **streams);
-//    void callPlayerJniError(ThreadMode threadMode,int code,char *msg);
+    void initCreateOpenSLES();
+    void privateAnalysisStream(ThreadType threadMode, AVFormatContext *pFormatContext);
+    int getSampleRateForOpenSLES(int sampleRate);
+    void pause();
+    void resume();
+    void stop();
     void release();
+    void analysisStream(ThreadType threadMode,AVFormatContext *streams);
+//    void callPlayerJniError(ThreadType threadMode,int code,char *msg);
+
 private:
 //    void FFmpegAudio::PlayAudioTack();
 

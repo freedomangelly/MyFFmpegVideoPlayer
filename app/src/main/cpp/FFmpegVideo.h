@@ -18,11 +18,9 @@ extern "C" {
 };
 class FFmpegVideo : public FFmpegMedia {
 public:
-    SwsContext *pSwsContext = NULL;
+    AVFrame *pFrameYUV420p=NULL;
     uint8_t *pFrameBuffer = NULL;
-    int frameSize;
-    AVFrame *pRgbaFrame;
-    jobject surface;
+    SwsContext *pSwsContext = NULL;
     FFmpegAudio *pAudio;
     /**
      * 视频的延时时间
@@ -33,6 +31,8 @@ public:
      * 默认情况下最合适的一个延迟时间，动态获取
      */
     double defaultDelayTime = 0.04;
+    bool  supportStiffCodec=false;
+    AVBSFContext *pBSFContext;
 public:
     FFmpegVideo(int streamIndex, FFMpegJniCall *pJniCall, FFmpegPlayerStatus *pPlayerStatus, FFmpegAudio *pAudio);
 
@@ -41,18 +41,16 @@ public:
 public:
     void play();
 
-    void privateAnalysisStream(ThreadMode threadMode, AVFormatContext *pFormatContext);
+    virtual void analysisStream(ThreadType threadMode, AVFormatContext *pFormatContext);
 
     void release();
-
-    void setSurface(jobject surface);
 
     /**
      * 视频同步音频，计算获取休眠的时间
      * @param pFrame 当前视频帧
      * @return 休眠时间（s）
      */
-    double getFrameSleepTime(AVFrame *pFrame);
+    double getFrameSleepTime(int64_t pts);
 };
 
 

@@ -3,42 +3,60 @@
 //
 
 #include "FFmpegPacketQueue.h"
-
-FFmpegPacketQueue::FFmpegPacketQueue() {
-    pPacketQueue=new std::queue<AVPacket *>;
-    pthread_mutex_init(&packetMutex,NULL);
-    pthread_cond_init(&packetCond,NULL);
-}
-
-FFmpegPacketQueue::~FFmpegPacketQueue() {
-    if(pPacketQueue!=NULL){
-        clear();
-        delete(pPacketQueue);
-        pPacketQueue=NULL;
-    }
-    pthread_mutex_destroy(&packetMutex);
-    pthread_cond_destroy(&packetCond);
-}
+#include "MyConsts.h"
 
 void FFmpegPacketQueue::push(AVPacket *pPacket) {
     pthread_mutex_lock(&packetMutex);
-    pPacketQueue->push(pPacket);
+    pPacketQueue.push(pPacket);
     pthread_cond_signal(&packetCond);
     pthread_mutex_unlock(&packetMutex);
 }
 
-AVPacket *FFmpegPacketQueue::pop() {
-    AVPacket *pPacket;
+
+int FFmpegPacketQueue::pop(AVPacket *avPacket) {
     pthread_mutex_lock(&packetMutex);
-    while (pPacketQueue->empty()){
-        pthread_cond_wait(&packetCond,&packetMutex);
+    while (play_status!=NULL && !play_status->isExit){
+        if(pPacketQueue.size()>0){
+            AVPacket *packet=pPacketQueue.front();
+            if(av_packet_ref(avPacket,packet)==0){
+                pPacketQueue.pop();
+            }
+            av_packet_free(&packet);
+            break;
+        } else{
+            pthread_cond_wait(&packetCond,&packetMutex);
+        }
     }
-    pPacket=pPacketQueue->front();
-    pPacketQueue->pop();
     pthread_mutex_unlock(&packetMutex);
-    return pPacket;
+    return 0;
+}
+
+FFmpegPacketQueue::FFmpegPacketQueue(FFmpegPlayerStatus *play_state) {
+    pthread_mutex_init(&packetMutex,NULL);
+    pthread_cond_init(&packetCond,NULL);
+    this->play_status=play_state;
+}
+
+FFmpegPacketQueue::~FFmpegPacketQueue() {
+    clear();
+    pthread_mutex_destroy(&packetMutex);
+    pthread_cond_destroy(&packetCond);
+}
+
+
+bool FFmpegPacketQueue::empty() {
+    return pPacketQueue.empty();
 }
 
 void FFmpegPacketQueue::clear() {
-// 需要清除队列，还需要清除每个 AVPacket* 的内存数据
+    pthread_cond_signal(&packetCond);
+    pthread_mutex_lock(&packetMutex);
+
+    while (!pPacketQueue.empty()){
+        AVPacket *avPacket=pPacketQueue.front();
+        pPacketQueue.pop();
+        av_packet_free(&avPacket);
+    }
+    pthread_mutex_unlock(&packetMutex);
 }
+

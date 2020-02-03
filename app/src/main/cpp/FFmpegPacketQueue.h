@@ -7,6 +7,8 @@
 
 #include <queue>
 #include <pthread.h>
+#include "FFmpegPlayerStatus.h"
+
 extern  "C"{
 #include <libavcodec/avcodec.h>
 };
@@ -14,19 +16,20 @@ extern  "C"{
 
 class FFmpegPacketQueue {
 public:
-    std::queue<AVPacket *> *pPacketQueue;
+    std::queue<AVPacket *> pPacketQueue;
     pthread_mutex_t packetMutex;
     pthread_cond_t packetCond;
+    FFmpegPlayerStatus *play_status;
 
 public:
-    FFmpegPacketQueue();
+    FFmpegPacketQueue(FFmpegPlayerStatus *fFmpegPlayerStatus);
     ~FFmpegPacketQueue();
 
 public :
-    void push(AVPacket *pPacket);
+    void push(AVPacket *avPacket);
 
-    AVPacket *pop();
-
+    int pop(AVPacket *av_packet);
+    bool empty();
     void clear();
 };
 

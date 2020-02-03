@@ -7,7 +7,7 @@
 
 #include <jni.h>
 
-enum ThreadMode{
+enum ThreadType{
     THREAD_CHILD,THREAD_MAIN
 };
 
@@ -15,9 +15,21 @@ class FFMpegJniCall {
 public :
     JavaVM *javaVM;
     JNIEnv *jniEnv;
-    jmethodID  jPlayerErrorMid;
-    jmethodID  jPlayPrepareMid;
     jobject  jPlayerObj;
+
+    jmethodID  prepared_mid;
+    jmethodID  errorMid;
+    jmethodID  loadingMid;
+    jmethodID  progressMid;
+    jmethodID  completeMid;
+    jmethodID  renderMid;
+    jmethodID  isSupportStiffCodecMid;
+    jmethodID  initMediaCodecMid;
+    jmethodID  decodePacketMid;
+
+
+    jmethodID  jPlayMusicInfoMid;
+    jmethodID  jPlayCallbackPcmMid;
 public:
     FFMpegJniCall(JavaVM *javaVm ,JNIEnv *jniEnv,jobject jPlayerObj);
     ~FFMpegJniCall();
@@ -27,10 +39,30 @@ private:
 
 public :
 
+    void onCallPlayerPrepared(ThreadType mode);
 
-    void callPlayerError(ThreadMode threadMode,int code, char *msg);
+    void onCallLoading(ThreadType threadType,bool loading);
 
-    void callPlayerPrepared(ThreadMode mode);
+    void onCallProgress(ThreadType threadType,int current,int total);
+
+    void onCallPlayerError(ThreadType threadMode, int code, const char *msg);
+
+    void onCallComplete(ThreadType threadType);
+
+    void onCallRenderYUV420P(int width,int height,uint8_t *fy,uint8_t *fu,uint8_t *fv);
+
+    bool onCallIsSupportStiffCodec(ThreadType threadType,const char *codecName);
+
+    void onCallInitMediaCodec(ThreadType threadType,const char *mine,int width,int height,int csd0Size,int csd1Size,uint8_t *csd0,uint8_t *csd1);
+
+    void onCallDecodePacket(int i,uint8_t *string);
+
+public:
+
+    void callMusicInfo(ThreadType mode,int sampleRate, int channels);
+
+    void callCallbackPcm(ThreadType mode,uint8_t *bytes,int size);
+
 };
 
 

@@ -9,22 +9,6 @@ extern "C" {
 #endif
 /*
  * Class:     com_liuy_myffmpegplayer_ffmpegplayer_MediaPlayerJNI
- * Method:    nPlay
- * Signature: ()V
- */
-JNIEXPORT void JNICALL Java_com_liuy_myffmpegplayer_ffmpegplayer_MediaPlayerJNI_nPlay
-  (JNIEnv *, jobject);
-
-/*
- * Class:     com_liuy_myffmpegplayer_ffmpegplayer_MediaPlayerJNI
- * Method:    nPlay2
- * Signature: (Ljava/lang/String;)V
- */
-JNIEXPORT void JNICALL Java_com_liuy_myffmpegplayer_ffmpegplayer_MediaPlayerJNI_nPlay2
-  (JNIEnv *, jobject, jstring);
-
-/*
- * Class:     com_liuy_myffmpegplayer_ffmpegplayer_MediaPlayerJNI
  * Method:    nPrepareAsync
  * Signature: (Ljava/lang/String;)V
  */
@@ -38,6 +22,46 @@ JNIEXPORT void JNICALL Java_com_liuy_myffmpegplayer_ffmpegplayer_MediaPlayerJNI_
  */
 JNIEXPORT void JNICALL Java_com_liuy_myffmpegplayer_ffmpegplayer_MediaPlayerJNI_nPrepare
   (JNIEnv *, jobject, jstring);
+
+/*
+ * Class:     com_liuy_myffmpegplayer_ffmpegplayer_MediaPlayerJNI
+ * Method:    nStart
+ * Signature: ()V
+ */
+JNIEXPORT void JNICALL Java_com_liuy_myffmpegplayer_ffmpegplayer_MediaPlayerJNI_nStart
+  (JNIEnv *, jobject);
+
+/*
+ * Class:     com_liuy_myffmpegplayer_ffmpegplayer_MediaPlayerJNI
+ * Method:    nPause
+ * Signature: ()V
+ */
+JNIEXPORT void JNICALL Java_com_liuy_myffmpegplayer_ffmpegplayer_MediaPlayerJNI_nPause
+  (JNIEnv *, jobject);
+
+/*
+ * Class:     com_liuy_myffmpegplayer_ffmpegplayer_MediaPlayerJNI
+ * Method:    nResume
+ * Signature: ()V
+ */
+JNIEXPORT void JNICALL Java_com_liuy_myffmpegplayer_ffmpegplayer_MediaPlayerJNI_nResume
+  (JNIEnv *, jobject);
+
+/*
+ * Class:     com_liuy_myffmpegplayer_ffmpegplayer_MediaPlayerJNI
+ * Method:    nStop
+ * Signature: ()V
+ */
+JNIEXPORT void JNICALL Java_com_liuy_myffmpegplayer_ffmpegplayer_MediaPlayerJNI_nStop
+  (JNIEnv *, jobject);
+
+/*
+ * Class:     com_liuy_myffmpegplayer_ffmpegplayer_MediaPlayerJNI
+ * Method:    nSeekTo
+ * Signature: (I)V
+ */
+JNIEXPORT void JNICALL Java_com_liuy_myffmpegplayer_ffmpegplayer_MediaPlayerJNI_nSeekTo
+  (JNIEnv *, jobject, jint);
 
 #ifdef __cplusplus
 }

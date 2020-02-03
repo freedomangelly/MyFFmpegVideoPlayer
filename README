@@ -1,0 +1,204 @@
+av_register_all()：的作用是初始化所有组件，只有调用了该函数，才能使用复用器和编解码器（源码）
+avformat_open_input()/avformat_close_input(): 函数会读文件头，对 mp4 文件而言，它会解析所有的 box。但它知识把读到的结果保存在对应的数据结构下。这个时候，AVStream 中的很多字段都是空白的。
+av_dump_format(): 打印视音频信息
+avformat_find_stream_info()：读取一部分视音频数据并且获得一些相关的信息，会检测一些重要字段，如果是空白的，就设法填充它们。因为我们解析文件头的时候，已经掌握了大量的信息，avformat_find_stream_info 就是通过这些信息来填充自己的成员，当重要的成员都填充完毕后，该函数就返回了。这中情况下，该函数效率很高。但对于某些文件，单纯的从文件头中获取信息是不够的，比如 video 的 pix_fmt 是需要调用 h264_decode_frame 才可以获取其pix_fmt的。
+av_find_best_stream(): 获取音视频及字幕的 stream_index , 以前没有这个函数时，我们一般都是写的 for 循环。
+av_packet_free(): 首先将 AVPacket 指向的数据域的引用技术减1（数据域的引用技术减为0时会自动释放） 接着，释放为 AVPacket 分配的空间。
+av_packet_unref(): 减少数据域的引用技术，当引用技术减为0时，会自动释放数据域所占用的空间。
+avcodec_find_decoder 查找解码器
+https://www.jianshu.com/p/d8300535bbf0
+
+
+FFMPEG结构体分析：AVFrame
+FFMPEG结构体分析：AVFormatContext
+FFMPEG结构体分析：AVCodecContext
+FFMPEG结构体分析：AVIOContext
+FFMPEG结构体分析：AVCodec
+FFMPEG结构体分析：AVStream
+FFMPEG结构体分析：AVPacket
+更多FFmepg信息参考雷霄骅的博客 https://me.csdn.net/leixiaohua1020
+https://blog.csdn.net/leixiaohua1020/article/details/14214859
+
+
+AVFrame 是包含码流参数较多的结构体。本文将会详细分析一下该结构体里主要变量的含义和作用。
+AVFrame结构体一般用于存储原始数据（即非压缩数据，例如对视频来说是YUV，RGB，对音频来说是PCM），此外还包含了一些相关的信息。比如说，解码的时候存储了宏块类型表，QP表，运动矢量表等数据。编码的时候也存储了相关的数据。因此在使用FFMPEG进行码流分析的时候，AVFrame是一个很重要的结构体。
+下面看几个主要变量的作用（在这里考虑解码的情况）：
+uint8_t *data[AV_NUM_DATA_POINTERS]：解码后原始数据（对视频来说是YUV，RGB，对音频来说是PCM）
+
+int linesize[AV_NUM_DATA_POINTERS]：data中“一行”数据的大小。注意：未必等于图像的宽，一般大于图像的宽。
+
+int width, height：视频帧宽和高（1920x1080,1280x720...）
+
+int nb_samples：音频的一个AVFrame中可能包含多个音频帧，在此标记包含了几个
+
+int format：解码后原始数据类型（YUV420，YUV422，RGB24...）
+
+int key_frame：是否是关键帧
+
+enum AVPictureType pict_type：帧类型（I,B,P...）
+
+AVRational sample_aspect_ratio：宽高比（16:9，4:3...）
+
+int64_t pts：显示时间戳
+
+int coded_picture_number：编码帧序号
+
+int display_picture_number：显示帧序号
+
+int8_t *qscale_table：QP表
+
+uint8_t *mbskip_table：跳过宏块表
+
+int16_t (*motion_val[2])[2]：运动矢量表
+
+uint32_t *mb_type：宏块类型表
+
+short *dct_coeff：DCT系数，这个没有提取过
+
+int8_t *ref_index[2]：运动估计参考帧列表（貌似H.264这种比较新的标准才会涉及到多参考帧）
+
+int interlaced_frame：是否是隔行扫描
+
+uint8_t motion_subsample_log2：一个宏块中的运动矢量采样个数，取log的
+=======================================================================================================================
+AVFormatContext 是包含码流参数较多的结构体。本文将会详细分析一下该结构体里每个变量的含义和作用。
+在使用FFMPEG进行开发的时候，AVFormatContext是一个贯穿始终的数据结构，很多函数都要用到它作为参数。它是FFMPEG解封装（flv，mp4，rmvb，avi）功能的结构体。下面看几个主要变量的作用（在这里考虑解码的情况）：
+
+struct AVInputFormat *iformat：输入数据的封装格式
+
+AVIOContext *pb：输入数据的缓存
+
+unsigned int nb_streams：视音频流的个数
+
+AVStream **streams：视音频流
+
+char filename[1024]：文件名
+
+int64_t duration：时长（单位：微秒us，转换为秒需要除以1000000）
+
+int bit_rate：比特率（单位bps，转换为kbps需要除以1000）
+
+AVDictionary *metadata：元数据
+
+===========================================================================================================================
+AVCodecContext 是包含变量较多的结构体（感觉差不多是变量最多的结构体）。本文将会大概分析一下该结构体里每个变量的含义和作用。因为如果每个变量都分析的话，工作量太大，实在来不及。
+
+enum AVMediaType codec_type：编解码器的类型（视频，音频...）
+
+struct AVCodec  *codec：采用的解码器AVCodec（H.264,MPEG2...）
+
+int bit_rate：平均比特率
+
+uint8_t *extradata; int extradata_size：针对特定编码器包含的附加信息（例如对于H.264解码器来说，存储SPS，PPS等）
+
+AVRational time_base：根据该参数，可以把PTS转化为实际的时间（单位为秒s）
+
+int width, height：如果是视频的话，代表宽和高
+
+int refs：运动估计参考帧的个数（H.264的话会有多帧，MPEG2这类的一般就没有了）
+
+int sample_rate：采样率（音频）
+
+int channels：声道数（音频）
+
+enum AVSampleFormat sample_fmt：采样格式
+
+int profile：型（H.264里面就有，其他编码标准应该也有）
+
+int level：级（和profile差不太多）
+============================================================================================================================
+AVIOContext 是FFMPEG管理输入输出数据的结构体。本文将会详细分析一下该结构体里每个变量的含义和作用。
+
+unsigned char *buffer：缓存开始位置
+
+int buffer_size：缓存大小（默认32768）
+
+unsigned char *buf_ptr：当前指针读取到的位置
+
+unsigned char *buf_end：缓存结束的位置
+
+void *opaque：URLContext结构体
+
+=============================================================================================================================
+AVCodec 是存储编解码器信息的结构体。本文将会详细分析一下该结构体里每个变量的含义和作用。
+
+const char *name：编解码器的名字，比较短
+
+const char *long_name：编解码器的名字，全称，比较长
+
+enum AVMediaType type：指明了类型，是视频，音频，还是字幕
+
+enum AVCodecID id：ID，不重复
+
+const AVRational *supported_framerates：支持的帧率（仅视频）
+
+const enum AVPixelFormat *pix_fmts：支持的像素格式（仅视频）
+
+const int *supported_samplerates：支持的采样率（仅音频）
+
+const enum AVSampleFormat *sample_fmts：支持的采样格式（仅音频）
+
+const uint64_t *channel_layouts：支持的声道数（仅音频）
+
+int priv_data_size：私有数据的大小
+
+==============================================================================================================================
+AVStream是存储每一个视频/音频流信息的结构体。本文将会分析一下该结构体里重要变量的含义和作用
+
+int index：标识该视频/音频流
+
+AVCodecContext *codec：指向该视频/音频流的AVCodecContext（它们是一一对应的关系）
+
+AVRational time_base：时基。通过该值可以把PTS，DTS转化为真正的时间。FFMPEG其他结构体中也有这个字段，但是根据我的经验，只有AVStream中的time_base是可用的。PTS*time_base=真正的时间
+
+int64_t duration：该视频/音频流长度
+
+AVDictionary *metadata：元数据信息
+
+AVRational avg_frame_rate：帧率（注：对视频来说，这个挺重要的）
+
+AVPacket attached_pic：附带的图片。比如说一些MP3，AAC音频文件附带的专辑封面。
+=================================================================================================================================
+AVPacket是存储压缩编码数据相关信息的结构体。本文将会详细分析一下该结构体里重要变量的含义和作用。
+uint8_t *data：压缩编码的数据。
+
+例如对于H.264来说。1个AVPacket的data通常对应一个NAL。
+
+注意：在这里只是对应，而不是一模一样。他们之间有微小的差别：使用FFMPEG类库分离出多媒体文件中的H.264码流
+
+因此在使用FFMPEG进行视音频处理的时候，常常可以将得到的AVPacket的data数据直接写成文件，从而得到视音频的码流文件。
+
+int   size：data的大小
+
+int64_t pts：显示时间戳
+
+int64_t dts：解码时间戳
+
+int   stream_index：标识该AVPacket所属的视频/音频流。
+
+==================================================================================================================================
+AVCodecParameters
+
+enum AVMediaType codec_type; 　　　// 编码类型。说明这段流数据究竟是音频还是视频。
+
+enum AVCodecID codec_id     　　　　 // 编码格式。说明这段流的编码格式，h264，MPEG4, MJPEG，etc...
+
+uint32_t  codecTag;                   　　　  //  一般不用
+
+int format;                                 　　　　//  格式。对于视频来说指的就是像素格式(YUV420,YUV422...)，对于音频来说，指的就是音频的采样格式。
+
+int width, int height;                  　　　　// 视频的宽高，只有视频有
+
+uint64_t channel_layout;             　　　// 取默认值即可 仅音频。频道布局位掩码。如果通道布局未知或未指定，则可以为0，否则设置的位数必须等于通道字段。
+
+int channels;                             　　　   // 声道数
+
+int sample_rate;                    　　　　   // 样本率
+
+int frame_size;                            　　　 // 只针对音频，一帧音频的大小
+=======================================================================================================================================
+AVRational时间机
+
+ int num; ///< Numerator numberator: 分子
+ int den; ///< Denominator denominator: 分母
+

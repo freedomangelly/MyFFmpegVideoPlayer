@@ -3,3 +3,7 @@
 //
 
 #include "FFmpegPlayerStatus.h"
+
+FFmpegPlayerStatus::FFmpegPlayerStatus() {
+    isExit= false;
+}
